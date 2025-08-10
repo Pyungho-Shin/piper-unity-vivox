@@ -192,7 +192,8 @@ public class TextChatUI : MonoBehaviour
         {
             return;
         }
-        VivoxService.Instance.TextToSpeechSendMessage(MessageInputField.text, TextToSpeechMessageType.RemoteTransmissionWithLocalPlayback);
+        // VivoxService.Instance.TextToSpeechSendMessage(MessageInputField.text, TextToSpeechMessageType.RemoteTransmissionWithLocalPlayback);
+        VivoxVoiceManager.Instance.TextToSpeechSendMessage(MessageInputField.text);
         ClearTextField();
     }
 

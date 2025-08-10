@@ -23,7 +23,6 @@ public class PiperManager : MonoBehaviour
     private bool isInitialized = false;
 
     public bool playImmediately = true;
-    public bool saveAudio = true;
 
     [Range(0.0f, 1.0f)] public float commaDelay = 0.1f;
     [Range(0.0f, 1.0f)] public float periodDelay = 0.5f;
@@ -40,11 +39,6 @@ public class PiperManager : MonoBehaviour
             if (_instance == null)
             {
                 _instance = FindObjectOfType<PiperManager>();
-                if (_instance == null)
-                {
-                    GameObject singletonObject = new GameObject(nameof(PiperManager));
-                    _instance = singletonObject.AddComponent<PiperManager>();
-                }
             }
             return _instance;
         }
@@ -65,11 +59,6 @@ public class PiperManager : MonoBehaviour
         {
             if (audioData != null && audioData.Length > 0 )
             {
-                if (saveAudio)
-                {
-                    SaveToWav(audioData, sampleRate);
-                }
-                
                 if (playImmediately)
                 {
                     Debug.Log($"Audio data generated with length: {audioData.Length}, Sample Rate: {sampleRate}");
@@ -315,44 +304,6 @@ public class PiperManager : MonoBehaviour
         // audioSource.PlayOneShot(clip);
     }
     
-    
-    void SaveToWav(float[] audioData, int sampleRate)
-    {
-        var filePath = Path.Combine(Application.persistentDataPath, "PiperAudio.wav");
-        
-        using (var fileStream = new FileStream(filePath, FileMode.Create))
-        using (var writer = new BinaryWriter(fileStream))
-        {
-            int sampleCount = audioData.Length;
-            int channelCount = 1; // 모노 채널
-
-            // WAV 헤더 작성
-            writer.Write(System.Text.Encoding.UTF8.GetBytes("RIFF"));
-            writer.Write(36 + sampleCount * 2); // 전체 파일 크기
-            writer.Write(System.Text.Encoding.UTF8.GetBytes("WAVE"));
-            writer.Write(System.Text.Encoding.UTF8.GetBytes("fmt "));
-            writer.Write(16); // 서브 청크 크기
-            writer.Write((short)1); // 오디오 포맷 (PCM)
-            writer.Write((short)channelCount); // 채널 수
-            writer.Write(sampleRate); // 샘플링 레이트
-            writer.Write(sampleRate * channelCount * 2); // 바이트 레이트
-            writer.Write((short)(channelCount * 2)); // 블록 정렬
-            writer.Write((short)16); // 비트 깊이
-
-            writer.Write(System.Text.Encoding.UTF8.GetBytes("data"));
-            writer.Write(sampleCount * 2); // 데이터 청크 크기
-
-            // 오디오 데이터 작성
-            foreach (var sample in audioData)
-            {
-                short intSample = (short)(Mathf.Clamp(sample, -1f, 1f) * short.MaxValue);
-                writer.Write(intSample);
-            }
-        }
-
-        Debug.Log($"WAV 파일이 저장되었습니다: {filePath}");
-    }
-
     private void _WarmupModel()
     {
         Debug.Log("Warming up the model with a dummy run...");

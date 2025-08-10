@@ -1,10 +1,12 @@
 {
     "name": "ChatChannelSample",
+    "rootNamespace": "",
     "references": [
         "VivoxUnity",
         "Unity.Services.Core",
         "Unity.Services.Vivox",
-        "Unity.Services.Authentication"
+        "Unity.Services.Authentication",
+        "Unity.InferenceEngine"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

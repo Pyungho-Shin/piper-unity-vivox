@@ -2,6 +2,7 @@ using UnityEngine;
 using Unity.Services.Core;
 using Unity.Services.Vivox;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 #if AUTH_PACKAGE_PRESENT
 using Unity.Services.Authentication;
@@ -26,6 +27,8 @@ public class VivoxVoiceManager : MonoBehaviour
     [SerializeField]
     string _server;
 
+    public bool usePiper = false;
+    
     /// <summary>
     /// Access singleton instance through this propriety.
     /// </summary>
@@ -70,9 +73,29 @@ public class VivoxVoiceManager : MonoBehaviour
             options.SetVivoxCredentials(_server, _domain, _issuer, _key);
         }
 
+        PiperManager.Instance.OnAudioDataGenerated += OnAudioDataGenerated;
+        
         await UnityServices.InitializeAsync(options);
         await VivoxService.Instance.InitializeAsync();
 
+    }
+
+    private void OnDestroy()
+    {
+        if(PiperManager.Instance != null)
+        {
+            PiperManager.Instance.OnAudioDataGenerated -= OnAudioDataGenerated;
+        }
+    }
+
+    void OnAudioDataGenerated(float[] audioData, int sampleRate)
+    {
+        if (usePiper)
+        {
+            var filePath = Path.Combine(Application.persistentDataPath, "PiperAudio.wav");
+            SaveToWav(filePath, audioData, sampleRate);
+            VivoxService.Instance.StartAudioInjection(filePath);
+        }
     }
 
     public async Task InitializeAsync(string playerName)
@@ -90,5 +113,52 @@ public class VivoxVoiceManager : MonoBehaviour
     bool CheckManualCredentials()
     {
         return !(string.IsNullOrEmpty(_issuer) && string.IsNullOrEmpty(_domain) && string.IsNullOrEmpty(_server));
+    }
+    
+    public void TextToSpeechSendMessage(string message)
+    {
+        if (usePiper)
+        {
+            PiperManager.Instance.Synthesize(message);
+        }
+        else
+        {
+            VivoxService.Instance.TextToSpeechSendMessage(message, TextToSpeechMessageType.RemoteTransmissionWithLocalPlayback);
+        }
+    }
+    
+    void SaveToWav(string filePath, float[] audioData, int sampleRate)
+    {
+        using (var fileStream = new FileStream(filePath, FileMode.Create))
+        using (var writer = new BinaryWriter(fileStream))
+        {
+            int sampleCount = audioData.Length;
+            int channelCount = 1; // 모노 채널
+
+            // WAV 헤더 작성
+            writer.Write(System.Text.Encoding.UTF8.GetBytes("RIFF"));
+            writer.Write(36 + sampleCount * 2); // 전체 파일 크기
+            writer.Write(System.Text.Encoding.UTF8.GetBytes("WAVE"));
+            writer.Write(System.Text.Encoding.UTF8.GetBytes("fmt "));
+            writer.Write(16); // 서브 청크 크기
+            writer.Write((short)1); // 오디오 포맷 (PCM)
+            writer.Write((short)channelCount); // 채널 수
+            writer.Write(sampleRate); // 샘플링 레이트
+            writer.Write(sampleRate * channelCount * 2); // 바이트 레이트
+            writer.Write((short)(channelCount * 2)); // 블록 정렬
+            writer.Write((short)16); // 비트 깊이
+
+            writer.Write(System.Text.Encoding.UTF8.GetBytes("data"));
+            writer.Write(sampleCount * 2); // 데이터 청크 크기
+
+            // 오디오 데이터 작성
+            foreach (var sample in audioData)
+            {
+                short intSample = (short)(Mathf.Clamp(sample, -1f, 1f) * short.MaxValue);
+                writer.Write(intSample);
+            }
+        }
+
+        Debug.Log($"WAV 파일이 저장되었습니다: {filePath}");
     }
 }
