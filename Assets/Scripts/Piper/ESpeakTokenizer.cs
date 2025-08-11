@@ -2,6 +2,8 @@ using UnityEngine;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System;
+using System.Collections;
+using System.IO;
 
 public class AudioConfig
 {
@@ -34,7 +36,7 @@ public class PiperConfig
 
 public class ESpeakTokenizer : MonoBehaviour
 {
-    public TextAsset jsonFile;
+    // public TextAsset jsonFile;
 
     public int SampleRate { get; private set; }
     public string Quality { get; private set; }
@@ -45,33 +47,78 @@ public class ESpeakTokenizer : MonoBehaviour
     private float[] inferenceParams;
     private bool isInitialized = false;
 
-    void Awake()
-    {
-        Initialize();
-    }
+    // isInitialized에 대한 public getter 추가
+    public bool IsInitialized { get { return isInitialized; } }
+    
+    // public string jsonFileName = "piper_config.json"; // Default JSON file name
+    // void Awake()
+    // {
+    //     Initialize();
+    // }
 
-    private void Initialize()
+    // public void Initialize(string jsonFileName)
+    // {
+    //     if (isInitialized)
+    //     {
+    //         Debug.LogWarning("Tokenizer is already initialized. Skipping.");
+    //         return;
+    //     }
+    //     
+    //     StartCoroutine(LoadJsonFromStreamingAssets(jsonFileName));
+    // }
+    
+    public IEnumerator LoadJsonFromStreamingAssets(string jsonFileName)
     {
-        if (jsonFile == null)
+        // 새로운 파일을 로드하기 전에 기존 상태를 초기화
+        isInitialized = false;
+        config = null;
+        inferenceParams = null;
+        
+        string jsonFilePath = Path.Combine(Application.streamingAssetsPath, "Models", jsonFileName + ".onnx.json");
+
+        string jsonText = null;
+
+        #if UNITY_ANDROID && !UNITY_EDITOR
+        using (UnityWebRequest www = UnityWebRequest.Get(jsonFilePath))
         {
-            Debug.LogError("JSON file is not assigned. Please assign it in the Inspector.");
-            return;
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Failed to load tokenizer JSON from StreamingAssets: {www.error}");
+                yield break;
+            }
+            jsonText = www.downloadHandler.text;
+        }
+        #else
+        if (!File.Exists(jsonFilePath))
+        {
+            Debug.LogError($"Tokenizer JSON file not found at path: {jsonFilePath}");
+            yield break;
+        }
+        jsonText = File.ReadAllText(jsonFilePath);
+        #endif
+
+        if (string.IsNullOrEmpty(jsonText))
+        {
+            Debug.LogError("Loaded JSON text is null or empty.");
+            yield break;
         }
 
         try
         {
-            config = JsonConvert.DeserializeObject<PiperConfig>(jsonFile.text);
+            config = JsonConvert.DeserializeObject<PiperConfig>(jsonText);
             if (config == null || config.audio == null || config.espeak == null || config.inference == null || config.PhonemeIdMap == null)
             {
                 Debug.LogError("JSON data is missing required fields or is invalid. Deserialization resulted in a partially/fully null object.");
                 config = null;
-                return;
+                yield break;
             }
         }
         catch (JsonException ex)
         {
             Debug.LogError($"Failed to parse JSON file. Error: {ex.Message}");
-            return;
+            yield break;
         }
 
         inferenceParams = new float[3]

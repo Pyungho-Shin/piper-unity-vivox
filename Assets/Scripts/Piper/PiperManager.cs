@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 [RequireComponent(typeof(AudioSource))]
 public class PiperManager : MonoBehaviour
 {
-    public ModelAsset modelAsset;
+    // public ModelAsset modelAsset;
     public ESpeakTokenizer tokenizer;
 
     public Text voiceNameText;
@@ -133,16 +133,12 @@ public class PiperManager : MonoBehaviour
 
         InitializeESpeak(espeakDataPath);
 
-        var model = ModelLoader.Load(modelAsset);
-        engine = new Worker(model, BackendType.GPUPixel);
-
-        voiceNameText.text = $"Model: {modelAsset.name}";
-
-        Debug.Log("Piper Manager initialized.");
+        // 이 부분에서 ESpeak 초기화만 수행하고, 모델은 로드하지 않음
+        InitializeESpeak(espeakDataPath);
+        
         isInitialized = true;
-
-        _WarmupModel();
-        Debug.Log("Finished warmup.");
+        Debug.Log("Piper Manager base initialization complete (eSpeak). Ready to load models.");
+        // LoadModelFromStreamingAssets("en_US-amy-medium");
     }
 
     private void InitializeESpeak(string dataPath)
@@ -170,6 +166,125 @@ public class PiperManager : MonoBehaviour
         else
         {
             Debug.LogError($"[PiperManager] eSpeak-ng Initialization FAILED. Error code: {initResult}");
+        }
+    }
+    
+    // public void LoadModelFromStreamingAssets(string modelFileName)
+    // {
+    //     if (!isInitialized)
+    //     {
+    //         Debug.LogError("Piper Manager is not ready. eSpeak data not initialized.");
+    //         return;
+    //     }
+    //
+    //     StartCoroutine(LoadModelCoroutine(modelFileName));
+    //     StartCoroutine(tokenizer.LoadJsonFromStreamingAssets(modelFileName));
+    // }
+
+    private IEnumerator LoadModelCoroutine(string modelFileName)
+    {
+        // 기존 엔진이 있다면 해제
+        if (engine != null)
+        {
+            Debug.Log("Disposing of the old model engine.");
+            engine.Dispose();
+            engine = null; // null로 설정하여 참조 제거
+        }
+        
+        
+        
+        
+        // Android의 경우 StreamingAssets 경로가 WWW를 통해 접근해야 함
+        #if UNITY_ANDROID && !UNITY_EDITOR
+        string fullPath = modelPath;
+        using (UnityWebRequest www = UnityWebRequest.Get(fullPath))
+        {
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Failed to load model from StreamingAssets: {www.error}");
+                yield break;
+            }
+
+            // 모델 데이터를 메모리로 로드
+            byte[] modelData = www.downloadHandler.data;
+            try
+            {
+                var model = ModelLoader.Load(modelData);
+                engine?.Dispose(); // 기존 엔진이 있다면 폐기
+                engine = new Worker(model, BackendType.GPUPixel);
+                voiceNameText.text = $"Model: {modelFileName}";
+                Debug.Log($"Model '{modelFileName}' loaded successfully.");
+                _WarmupModel();
+                Debug.Log("Finished warmup.");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Error loading model from byte array: {e.Message}");
+            }
+        }
+        #else
+        string modelPath = Path.Combine(Application.streamingAssetsPath, "Models", modelFileName + ".sentis");
+        if (!File.Exists(modelPath))
+        {
+            Debug.LogError($"Model file not found at path: {modelPath}");
+            yield break;
+        }
+        
+        var model = ModelLoader.Load(modelPath);
+        // engine?.Dispose();
+        engine = new Worker(model, BackendType.GPUPixel);
+        voiceNameText.text = $"Model: {modelFileName}";
+        Debug.Log($"Model '{modelFileName}' loaded successfully.");
+        
+        ESpeakNG.espeak_SetVoiceByName(tokenizer.Voice);
+        
+        _WarmupModel();
+        Debug.Log("Finished warmup.");
+        yield return null;
+        #endif
+    }
+    
+    // 새로운 public 메서드 추가 (외부 UI에서 호출될 메서드)
+    public void LoadNewModel(string modelFileName)
+    {
+        if (!isInitialized)
+        {
+            Debug.LogError("Piper Manager is not ready. eSpeak data not initialized.");
+            return;
+        }
+    
+        // 토크나이저와 모델을 순차적으로 로드
+        // 코루틴은 StartCoroutine으로 실행해야 함
+        StartCoroutine(LoadModelAndTokenizerAsync(modelFileName));
+    }
+    
+    private IEnumerator LoadModelAndTokenizerAsync(string modelFileName)
+    {
+        // 1. 토크나이저 JSON 파일 로드
+        Debug.Log($"Loading tokenizer config for model: {modelFileName}");
+        yield return StartCoroutine(tokenizer.LoadJsonFromStreamingAssets(modelFileName));
+
+        // 토크나이저 초기화가 성공했는지 확인
+        if (!tokenizer.IsInitialized)
+        {
+            Debug.LogError("Failed to initialize tokenizer. Aborting model load.");
+            yield break;
+        }
+
+        // 2. 센티스 모델 파일 로드
+        Debug.Log($"Loading Sentis model file for: {modelFileName}");
+        yield return StartCoroutine(LoadModelCoroutine(modelFileName));
+    
+        // 이 시점에서 `LoadModelCoroutine` 내의 `engine`이 초기화되었는지 확인
+        if (engine != null)
+        {
+            Debug.Log($"Model '{modelFileName}' and its tokenizer have been successfully loaded and set up.");
+        }
+        else
+        {
+            Debug.LogError($"Model '{modelFileName}' loading failed.");
         }
     }
 
