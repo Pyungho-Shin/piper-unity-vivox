@@ -20,7 +20,7 @@ This project integrates the **Piper Unity Sample** with the **Vivox SDK** to cre
 ## Development Environment and Requirements
 
   * **Unity**: `6000.0.50f1` or higher
-  * **Piper Unity Sample**: The foundational piper-unity repository by Sky Kim.
+  * **Piper Unity Sample**: The foundational [piper-unity repository](https://github.com/skykim/piper-unity) by Sky Kim.
   * **Vivox SDK for Unity**: Required for implementing Vivox voice channel functionality.
 
 ## Getting Started
@@ -36,3 +36,5 @@ This project integrates the **Piper Unity Sample** with the **Vivox SDK** to cre
 ### Contribution
 
 This project is built upon the excellent Piper Unity Sample created by Sky Kim. A sincere thank you to the original repository and its developer for providing the foundation for this project.
+
+Special thanks to Woojin Kim, whose inspiration led to the completion of this project.
