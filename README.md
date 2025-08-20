@@ -37,4 +37,4 @@ This project integrates the **Piper Unity Sample** with the **Vivox SDK** to cre
 
 This project is built upon the excellent Piper Unity Sample created by Sky Kim. A sincere thank you to the original repository and its developer for providing the foundation for this project.
 
-Special thanks to Woojin Kim, whose inspiration led to the completion of this project.
+Special thanks to Woojin Park, whose inspiration led to the completion of this project.
